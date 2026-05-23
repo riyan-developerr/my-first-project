@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ settings.app_name }} Admin</title>
+  <style>
+    body { margin: 0; font-family: Arial, sans-serif; background: #f7f8fa; color: #20242a; }
+    header { background: #16324f; color: white; padding: 18px 28px; }
+    main { padding: 24px; max-width: 1240px; margin: 0 auto; }
+    h1, h2 { margin: 0 0 14px; }
+    a { color: #174d8a; text-decoration: none; }
+    table { width: 100%; border-collapse: collapse; background: white; border: 1px solid #dde1e7; }
+    th, td { padding: 10px; border-bottom: 1px solid #e8ebef; text-align: left; vertical-align: top; font-size: 14px; }
+    th { background: #edf2f7; font-weight: 700; }
+    section { margin-bottom: 28px; }
+    .status { display: inline-block; padding: 3px 8px; border-radius: 999px; background: #e8eef5; font-size: 12px; }
+    .danger { color: #9a1f1f; }
+    .muted { color: #637083; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+    input[type="text"], input[type="number"] { padding: 7px; border: 1px solid #ccd4df; border-radius: 5px; width: 130px; }
+    button { padding: 7px 10px; border: 0; border-radius: 5px; background: #1f5d99; color: white; cursor: pointer; }
+    @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } main { padding: 14px; } table { font-size: 12px; } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>{{ settings.app_name }} Admin</h1>
+    <div class="muted">Review payment proofs, manage print queue, pricing, and printer routing.</div>
+  </header>
+  <main>
+    <section>
+      <h2>Jobs</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Order</th>
+            <th>Student</th>
+            <th>File</th>
+            <th>Options</th>
+            <th>Payment</th>
+            <th>Total</th>
+            <th>Created</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for job in jobs %}
+          <tr>
+            <td><a href="/admin/jobs/{{ job.id }}">{{ job.id[:8].upper() }}</a><br><span class="status">{{ job.status }}</span></td>
+            <td>{{ job.customer.name or job.customer.wa_id }}<br><span class="muted">{{ job.customer.wa_id }}</span></td>
+            <td>{{ job.uploaded_file.original_name }}<br><span class="muted">{{ job.uploaded_file.mime_type }}</span></td>
+            <td>{{ job.paper_size }}, {{ job.paper_finish or "?" }}, {{ job.color_mode or "?" }}, {{ job.sides or "?" }}<br>{{ job.copies }} copies, pages {{ job.page_range or "all" }}</td>
+            <td><span class="status">{{ job.payment_status }}</span></td>
+            <td>{% if job.total_amount is not none %}{{ job.currency }} {{ "%.2f"|format(job.total_amount) }}{% else %}<span class="muted">needs options</span>{% endif %}</td>
+            <td>{{ job.created_at.strftime("%Y-%m-%d %H:%M") }}</td>
+          </tr>
+        {% else %}
+          <tr><td colspan="7" class="muted">No jobs yet.</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </section>
+
+    <div class="grid">
+      <section>
+        <h2>Pricing Rules</h2>
+        <table>
+          <thead><tr><th>Profile</th><th>Price/Page</th><th>Active</th><th></th></tr></thead>
+          <tbody>
+          {% for rule in pricing_rules %}
+            <tr>
+              <td><form id="pricing-{{ rule.id }}" method="post" action="/admin/pricing/{{ rule.id }}"></form>{{ rule.paper_size }} {{ rule.paper_finish }} {{ rule.color_mode }} {{ rule.sides }}</td>
+              <td><input form="pricing-{{ rule.id }}" type="number" name="price_per_page" step="0.01" value="{{ rule.price_per_page }}"></td>
+              <td><input form="pricing-{{ rule.id }}" type="checkbox" name="active" {% if rule.active %}checked{% endif %}></td>
+              <td><button form="pricing-{{ rule.id }}" type="submit">Save</button></td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        <form method="post" action="/admin/pricing" style="margin-top:12px; background:white; border:1px solid #dde1e7; padding:12px;">
+          <strong>Add pricing rule</strong><br>
+          <input name="paper_size" placeholder="A4" value="A4">
+          <input name="paper_finish" placeholder="normal/glossy">
+          <input name="color_mode" placeholder="bw/color">
+          <input name="sides" placeholder="single/double">
+          <input type="number" name="price_per_page" step="0.01" placeholder="Price">
+          <button type="submit">Add</button>
+        </form>
+      </section>
+
+      <section>
+        <h2>Printer Profiles</h2>
+        <table>
+          <thead><tr><th>Profile</th><th>Printer Name</th><th>Active</th><th></th></tr></thead>
+          <tbody>
+          {% for printer in printers %}
+            <tr>
+              <td><form id="printer-{{ printer.id }}" method="post" action="/admin/printers/{{ printer.id }}"></form>{{ printer.name }}<br><span class="muted">{{ printer.paper_size }} {{ printer.paper_finish }} {{ printer.color_mode }} {{ printer.sides }}</span></td>
+              <td><input form="printer-{{ printer.id }}" type="text" name="printer_name" value="{{ printer.printer_name }}"></td>
+              <td><input form="printer-{{ printer.id }}" type="checkbox" name="active" {% if printer.active %}checked{% endif %}></td>
+              <td><button form="printer-{{ printer.id }}" type="submit">Save</button></td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        <form method="post" action="/admin/printers" style="margin-top:12px; background:white; border:1px solid #dde1e7; padding:12px;">
+          <strong>Add printer profile</strong><br>
+          <input name="name" placeholder="A4 Color">
+          <input name="printer_name" placeholder="Windows printer name">
+          <input name="paper_size" placeholder="A4" value="A4">
+          <input name="paper_finish" placeholder="normal/glossy">
+          <input name="color_mode" placeholder="bw/color">
+          <input name="sides" placeholder="single/double">
+          <button type="submit">Add</button>
+        </form>
+      </section>
+    </div>
+  </main>
+</body>
+</html>

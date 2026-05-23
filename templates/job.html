@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Order {{ job.id[:8].upper() }}</title>
+  <style>
+    body { margin: 0; font-family: Arial, sans-serif; background: #f7f8fa; color: #20242a; }
+    header { background: #16324f; color: white; padding: 18px 28px; }
+    main { padding: 24px; max-width: 940px; margin: 0 auto; }
+    a { color: #174d8a; text-decoration: none; }
+    section { background: white; border: 1px solid #dde1e7; padding: 18px; margin-bottom: 18px; border-radius: 6px; }
+    dl { display: grid; grid-template-columns: 180px 1fr; gap: 8px 14px; }
+    dt { font-weight: 700; }
+    dd { margin: 0; }
+    button { padding: 8px 11px; border: 0; border-radius: 5px; background: #1f5d99; color: white; cursor: pointer; margin: 4px 5px 4px 0; }
+    .danger { background: #9a1f1f; }
+    .warn { background: #8a5a12; }
+    input, textarea { padding: 8px; border: 1px solid #ccd4df; border-radius: 5px; }
+    textarea { width: 100%; min-height: 60px; }
+    .muted { color: #637083; }
+    .status { display: inline-block; padding: 3px 8px; border-radius: 999px; background: #e8eef5; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Order {{ job.id[:8].upper() }}</h1>
+    <div><a href="/admin" style="color: white;">Back to dashboard</a></div>
+  </header>
+  <main>
+    <section>
+      <h2>Job</h2>
+      <dl>
+        <dt>Status</dt><dd><span class="status">{{ job.status }}</span></dd>
+        <dt>Payment</dt><dd><span class="status">{{ job.payment_status }}</span></dd>
+        <dt>Student</dt><dd>{{ job.customer.name or job.customer.wa_id }} ({{ job.customer.wa_id }})</dd>
+        <dt>File</dt><dd><a href="/admin/files/{{ job.uploaded_file.id }}" target="_blank">{{ job.uploaded_file.original_name }}</a><br><span class="muted">{{ job.uploaded_file.mime_type }}, {{ job.uploaded_file.size_bytes }} bytes</span></dd>
+        <dt>Options</dt><dd>{{ job.paper_size }}, {{ job.paper_finish or "?" }}, {{ job.color_mode or "?" }}, {{ job.sides or "?" }}, {{ job.copies }} copies, pages {{ job.page_range or "all" }}</dd>
+        <dt>Total</dt><dd>{% if job.total_amount is not none %}{{ job.currency }} {{ "%.2f"|format(job.total_amount) }}{% else %}Needs options{% endif %}</dd>
+        <dt>Pickup Code</dt><dd>{{ job.pickup_code or "Not printed yet" }}</dd>
+        <dt>Failure</dt><dd>{{ job.failure_reason or "-" }}</dd>
+        <dt>AI Notes</dt><dd>{{ job.ai_notes or "-" }}</dd>
+      </dl>
+    </section>
+
+    <section>
+      <h2>Actions</h2>
+      <form method="post" action="/admin/jobs/{{ job.id }}/approve-payment" style="display:inline"><button type="submit">Approve Payment</button></form>
+      <form method="post" action="/admin/jobs/{{ job.id }}/requeue" style="display:inline"><button type="submit">Requeue</button></form>
+      <form method="post" action="/admin/jobs/{{ job.id }}/refund" style="display:inline"><button class="warn" type="submit">Mark Refunded</button></form>
+      <form method="post" action="/admin/jobs/{{ job.id }}/cancel" style="display:inline"><button class="danger" type="submit">Cancel</button></form>
+      <form method="post" action="/admin/jobs/{{ job.id }}/reprice" style="margin-top:12px">
+        <label>Manual total <input name="amount" type="number" step="0.01" value="{{ job.total_amount or 0 }}"></label>
+        <button type="submit">Update Price</button>
+      </form>
+      <form method="post" action="/admin/jobs/{{ job.id }}/reject-payment" style="margin-top:12px">
+        <textarea name="notes" placeholder="Reason for rejecting payment proof"></textarea>
+        <button class="warn" type="submit">Reject Payment</button>
+      </form>
+    </section>
+
+    <section>
+      <h2>Payment Proofs</h2>
+      {% for proof in proofs %}
+        <p>
+          <strong>{{ proof.kind }}</strong> <span class="status">{{ proof.status }}</span><br>
+          Transaction: {{ proof.transaction_id or "-" }}<br>
+          File: {% if proof.file_id %}<a href="/admin/files/{{ proof.file_id }}" target="_blank">View proof</a>{% else %}-{% endif %}<br>
+          Notes: {{ proof.notes or "-" }}<br>
+          Submitted: {{ proof.submitted_at.strftime("%Y-%m-%d %H:%M") }}
+        </p>
+      {% else %}
+        <p class="muted">No payment proof yet.</p>
+      {% endfor %}
+    </section>
+  </main>
+</body>
+</html>
